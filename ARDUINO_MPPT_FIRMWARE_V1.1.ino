@@ -344,7 +344,10 @@ void setup() {
   Serial.println("> FLASH MEMORY: SAVED DATA LOADED");    //Startup message 
 
   //INITIALIZE TUYA
-  initTuya();
+  //initTuya();
+  getTuyaSwitchState()
+  Serial.print("🔄 Synced breaker state: ");
+  Serial.println(breakerState ? "ON" : "OFF");
 
   //LCD INITIALIZATION
   if(enableLCD==1){
@@ -371,6 +374,6 @@ void loop() {
   Charging_Algorithm();   //TAB#5 - Battery Charging Algorithm                    
   Onboard_Telemetry();    //TAB#6 - Onboard telemetry (USB & Serial Telemetry)
   LCD_Menu();             //TAB#8 - Low Power Algorithm
-  updateTuyaBreaker(voltageOutput, powerInput);
+  controlTuyaBreaker(voltageOutput, powerInput);
 
 }
