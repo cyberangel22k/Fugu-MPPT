@@ -90,7 +90,6 @@ TaskHandle_t Core2;                 //SYSTEM PARAMETER  - Used for the ESP32 dua
 //Adafruit_ADS1015 ads;               //SYSTEM PARAMETER  - ADS1015 ADC Library (By: Adafruit) Kindly delete this line if you are using ADS1115
 Adafruit_ADS1115 ads;             //SYSTEM PARAMETER  - ADS1115 ADC Library (By: Adafruit) Kindly uncomment this if you are using ADS1115
 
-
 //====================================== USER PARAMETERS ===========================================//
 // The parameters below are the default parameters used when the MPPT charger settings have not     //
 // been set or saved through the LCD menu interface or mobile phone WiFi app. Some parameters here  //
@@ -130,7 +129,7 @@ enableLCDBacklight      = 1,           //   USER PARAMETER - Enable LCD display'
 overrideFan             = 0,           //   USER PARAMETER - Fan always on
 enableDynamicCooling    = 0;           //   USER PARAMETER - Enable for PWM cooling control 
 int
-serialTelemMode         = 1,           //  USER PARAMETER - Selects serial telemetry data feed (0 - Disable Serial, 1 - Display All Data, 2 - Display Essential, 3 - Number only)
+serialTelemMode         = 0,           //  USER PARAMETER - Selects serial telemetry data feed (0 - Disable Serial, 1 - Display All Data, 2 - Display Essential, 3 - Number only)
 pwmResolution           = 11,          //  USER PARAMETER - PWM Bit Resolution 
 pwmFrequency            = 39000,       //  USER PARAMETER - PWM Switching Frequency - Hz (For Buck)
 temperatureFan          = 60,          //  USER PARAMETER - Temperature threshold for fan to turn on
@@ -284,6 +283,10 @@ loopTimeEnd           = 0,           //SYSTEM PARAMETER - Used for the loop cycl
 secondsElapsed        = 0;           //SYSTEM PARAMETER - 
 
 
+//Setting Breaker Check Interval
+unsigned long lastBreakerCheck = 0;
+const unsigned long breakerCheckInterval = 60UL * 1000UL; // 1 minute
+
 
 //====================================== MAIN PROGRAM =============================================//
 // The codes below contain all the system processes for the MPPT firmware. Most of them are called //
@@ -343,12 +346,7 @@ void setup() {
   initializeFlashAutoload();                              //Load stored settings from flash memory       
   Serial.println("> FLASH MEMORY: SAVED DATA LOADED");    //Startup message 
 
-  //INITIALIZE TUYA
-  //initTuya();
-  getTuyaSwitchState()
-  Serial.print("🔄 Synced breaker state: ");
-  Serial.println(breakerState ? "ON" : "OFF");
-
+ 
   //LCD INITIALIZATION
   if(enableLCD==1){
     lcd.begin();
@@ -361,6 +359,23 @@ void setup() {
     delay(1500);
     lcd.clear();
   }
+  
+  //SYNC TIME
+  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+  Serial.print("⏳ Waiting for time sync...");
+  while (time(nullptr) < 1000000000) {
+  delay(500);
+  Serial.print(".");
+  }
+  Serial.println(" ✅ Time synced.");
+
+ //INITIALIZE TUYA
+ bool tuyaInitialized = false;
+
+ if (getTuyaAccessToken()) {
+  getTuyaBreakerStatus();
+  delay(1000);
+ }
 
   //SETUP FINISHED
   Serial.println("> MPPT HAS INITIALIZED");                //Startup message
@@ -374,6 +389,9 @@ void loop() {
   Charging_Algorithm();   //TAB#5 - Battery Charging Algorithm                    
   Onboard_Telemetry();    //TAB#6 - Onboard telemetry (USB & Serial Telemetry)
   LCD_Menu();             //TAB#8 - Low Power Algorithm
-  controlTuyaBreaker(voltageOutput, powerInput);
+  if (millis() - lastBreakerCheck >= breakerCheckInterval) {
+    lastBreakerCheck = millis();
+    controlTuyaBreaker(voltageOutput, powerInput);
+  }
 
 }
